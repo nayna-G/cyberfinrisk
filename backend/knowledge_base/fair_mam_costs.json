@@ -1,0 +1,91 @@
+{
+    "response_costs": {
+        "startup": {
+            "investigation": {
+                "min": 5000,
+                "likely": 10000,
+                "max": 20000
+            },
+            "containment": {
+                "min": 3000,
+                "likely": 8000,
+                "max": 15000
+            },
+            "recovery": {
+                "min": 5000,
+                "likely": 12000,
+                "max": 25000
+            }
+        },
+        "mid_size": {
+            "investigation": {
+                "min": 20000,
+                "likely": 40000,
+                "max": 80000
+            },
+            "containment": {
+                "min": 15000,
+                "likely": 30000,
+                "max": 60000
+            },
+            "recovery": {
+                "min": 15000,
+                "likely": 30000,
+                "max": 60000
+            }
+        },
+        "enterprise": {
+            "investigation": {
+                "min": 100000,
+                "likely": 200000,
+                "max": 400000
+            },
+            "containment": {
+                "min": 50000,
+                "likely": 100000,
+                "max": 250000
+            },
+            "recovery": {
+                "min": 100000,
+                "likely": 200000,
+                "max": 350000
+            }
+        }
+    },
+    "secondary_losses": {
+        "credit_monitoring": {
+            "startup": {
+                "min": 10000,
+                "likely": 20000,
+                "max": 50000
+            },
+            "mid_size": {
+                "min": 50000,
+                "likely": 100000,
+                "max": 250000
+            },
+            "enterprise": {
+                "min": 200000,
+                "likely": 500000,
+                "max": 1000000
+            }
+        },
+        "legal_counsel": {
+            "startup": {
+                "min": 5000,
+                "likely": 10000,
+                "max": 25000
+            },
+            "mid_size": {
+                "min": 20000,
+                "likely": 50000,
+                "max": 120000
+            },
+            "enterprise": {
+                "min": 100000,
+                "likely": 250000,
+                "max": 750000
+            }
+        }
+    }
+}

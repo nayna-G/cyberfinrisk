@@ -18,6 +18,9 @@ def compute_total_impact(company: CompanyContext, bug_type: str, gemini_result: 
             return val_or_obj.get("min", val_or_obj.get("likely", 0.0)), val_or_obj.get("likely", 0.0), val_or_obj.get("max", val_or_obj.get("likely", 0.0))
         return float(val_or_obj), float(val_or_obj), float(val_or_obj)
 
+    fw  = [r.upper() for r in company.regulatory_frameworks]
+    dt  = [d.upper() for d in (asset.sensitive_data_types if asset else company.sensitive_data_types)]
+
     # 1. Data breach cost
     if bug_info.get("data_exfiltration", False):
         cpr_obj = bc["cost_per_record_by_industry"].get(
@@ -47,10 +50,22 @@ def compute_total_impact(company: CompanyContext, bug_type: str, gemini_result: 
         data_breach = 0.0
         impact_params["data_breach"] = {"min": 0, "likely": 0, "max": 0}
 
-    # 2. Incident response
-    incident_obj = bc["incident_response_cost"].get(company.company_size, 100000)
-    inc_min, inc_likely, inc_max = get_range(incident_obj)
-    data_breach = data_breach # Keep for breakdown
+    # 2. Incident response (FAIR-MAM Detailed Breakdown)
+    with open("knowledge_base/fair_mam_costs.json") as f: mam = json.load(f)
+    resp_specs = mam["response_costs"].get(company.company_size, mam["response_costs"]["mid_size"])
+    legal_specs = mam["secondary_losses"]["legal_counsel"].get(company.company_size, mam["secondary_losses"]["legal_counsel"]["mid_size"])
+    
+    inc_min = resp_specs["investigation"]["min"] + resp_specs["containment"]["min"] + resp_specs["recovery"]["min"] + legal_specs["min"]
+    inc_likely = resp_specs["investigation"]["likely"] + resp_specs["containment"]["likely"] + resp_specs["recovery"]["likely"] + legal_specs["likely"]
+    inc_max = resp_specs["investigation"]["max"] + resp_specs["containment"]["max"] + resp_specs["recovery"]["max"] + legal_specs["max"]
+
+    # credit monitoring for PII/Sensitive data leakages
+    if "PII" in dt or "HEALTH" in dt:
+         monitor_specs = mam["secondary_losses"]["credit_monitoring"].get(company.company_size, mam["secondary_losses"]["credit_monitoring"]["mid_size"])
+         inc_min += monitor_specs["min"]
+         inc_likely += monitor_specs["likely"]
+         inc_max += monitor_specs["max"]
+
     impact_params["incident_response"] = {
         "min": inc_min,
         "likely": inc_likely,
@@ -76,8 +91,6 @@ def compute_total_impact(company: CompanyContext, bug_type: str, gemini_result: 
 
     # 4. Regulatory fines
     reg_min = reg_likely = reg_max = 0.0
-    fw  = [r.upper() for r in company.regulatory_frameworks]
-    dt  = [d.upper() for d in (asset.sensitive_data_types if asset else company.sensitive_data_types)]
     
     if "GDPR" in fw or "PII" in dt:
         fine = min(company.annual_revenue * rm["GDPR"]["fine_percentage_of_arr"], rm["GDPR"]["max_fine_usd"])
