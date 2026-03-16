@@ -15,7 +15,8 @@ def get_probability(
     probabilities: Dict,
     cve_id: Optional[str] = None,
     asset: Optional[dict] = None,
-    controls_efficacy: Optional[float] = None # Added for FAIR-CAM
+    controls_efficacy: Optional[float] = None,
+    epss_scores_cache: Optional[Dict[str, float]] = None # Added for optimization
 ) -> tuple[float, str]:
     """
     Returns (probability: float, source: str).
@@ -23,7 +24,15 @@ def get_probability(
     # Attempt EPSS lookup for CVE-identified vulnerabilities
     if cve_id and cve_id.upper().startswith("CVE-"):
         from engine.epss_client import get_epss_score, is_cisa_kev
-        epss_score = get_epss_score(cve_id)
+        
+        epss_score = None
+        cve_upper = cve_id.upper()
+        if epss_scores_cache is not None:
+            epss_score = epss_scores_cache.get(cve_upper)
+            
+        if epss_score is None:
+            epss_score = get_epss_score(cve_id)
+            
         is_kev = is_cisa_kev(cve_id)
         
         if epss_score is not None:

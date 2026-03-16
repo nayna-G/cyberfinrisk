@@ -127,7 +127,7 @@ class AnalysisResponse(BaseModel):
     gemini_enabled: bool
 
 
-def _process_single_finding(f: dict, company: CompanyContext, probabilities: dict, taxonomy: dict, gemini_api_key: Optional[str]) -> tuple:
+def _process_single_finding(f: dict, company: CompanyContext, probabilities: dict, taxonomy: dict, gemini_api_key: Optional[str], epss_scores_cache: Optional[dict] = None) -> tuple:
     from engine.classifier import classify_bug, get_fix_effort
     from engine.probability_model import get_probability
     from engine.impact_model import compute_total_impact
@@ -149,7 +149,7 @@ def _process_single_finding(f: dict, company: CompanyContext, probabilities: dic
     cve_id = f.get("cve_id") or f.get("raw_rule_id", "")
     controls_eff = asset.controls_efficacy if asset else None
     
-    baseline_p, prob_source = get_probability(bug_type, exposure, probabilities, cve_id=cve_id, asset=asset, controls_efficacy=controls_eff)
+    baseline_p, prob_source = get_probability(bug_type, exposure, probabilities, cve_id=cve_id, asset=asset, controls_efficacy=controls_eff, epss_scores_cache=epss_scores_cache)
 
     gemini_result = None
     effective_p   = baseline_p
@@ -221,9 +221,13 @@ def run_risk_engine(
     results       = []
     filtered_count = 0
 
+    from engine.epss_client import get_epss_scores_bulk
+    cve_ids = [f.get("cve_id") or f.get("raw_rule_id", "") for f in findings]
+    bulk_epss = get_epss_scores_bulk(cve_ids) if cve_ids else {}
+
     import concurrent.futures
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {executor.submit(_process_single_finding, f, company, probabilities, taxonomy, gemini_api_key): f for f in findings}
+        futures = {executor.submit(_process_single_finding, f, company, probabilities, taxonomy, gemini_api_key, bulk_epss): f for f in findings}
         for future in concurrent.futures.as_completed(futures):
             try:
                 res, is_filtered = future.result()
