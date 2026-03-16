@@ -127,6 +127,87 @@ class AnalysisResponse(BaseModel):
     gemini_enabled: bool
 
 
+def _process_single_finding(f: dict, company: CompanyContext, probabilities: dict, taxonomy: dict, gemini_api_key: Optional[str]) -> tuple:
+    from engine.classifier import classify_bug, get_fix_effort
+    from engine.probability_model import get_probability
+    from engine.impact_model import compute_total_impact
+    from engine.criticality import get_asset_criticality
+    from engine.expected_loss import compute_priority_score, compute_fix_cost, compute_roi
+
+    bug_type    = classify_bug(f.get("raw_rule_id", ""), f.get("message", ""))
+    fix_effort  = get_fix_effort(bug_type, taxonomy)
+    
+    asset = None
+    if company.assets:
+        for ac in company.assets:
+            for path in ac.paths:
+                if path in f["file"]:
+                    asset = ac; break
+            if asset: break
+
+    exposure = asset.exposure.upper() if asset else f.get("exposure", company.deployment_exposure.upper())
+    cve_id = f.get("cve_id") or f.get("raw_rule_id", "")
+    controls_eff = asset.controls_efficacy if asset else None
+    
+    baseline_p, prob_source = get_probability(bug_type, exposure, probabilities, cve_id=cve_id, asset=asset, controls_efficacy=controls_eff)
+
+    gemini_result = None
+    effective_p   = baseline_p
+    if gemini_api_key and f.get("code_context"):
+        gemini_result = analyze_vulnerability(
+            bug_type=bug_type,
+            file=f["file"],
+            line=f["line"],
+            code_context=f.get("code_context", ""),
+            message=f.get("message", ""),
+            exposure=exposure,
+            company=company,
+            baseline_probability=baseline_p,
+            asset=asset
+        )
+        if gemini_result:
+            effective_p = gemini_result.adjusted_probability
+            if gemini_result.false_positive_likelihood == "high" and not gemini_result.is_exploitable:
+                return None, True
+
+    breakdown, total_impact, impact_params = compute_total_impact(company, bug_type, gemini_result, asset)
+    _, crit_multiplier, _ = get_asset_criticality(f["file"])
+
+    from engine.monte_carlo import run_lec_simulation
+    sim_stats = run_lec_simulation(effective_p, impact_params)
+    expected_loss = sim_stats["mean"] * crit_multiplier
+    expected_loss_10th = sim_stats["p10"] * crit_multiplier
+    expected_loss_90th = sim_stats["p90"] * crit_multiplier
+
+    priority_score = compute_priority_score(expected_loss, fix_effort)
+    fix_cost       = compute_fix_cost(fix_effort, company.engineer_hourly_cost)
+    roi            = compute_roi(expected_loss, fix_cost)
+
+    result = RiskResult(
+        vulnerability_id       = f["id"],
+        bug_type               = bug_type,
+        file                   = f["file"],
+        line                   = f["line"],
+        severity               = f.get("severity", "medium"),
+        exposure               = exposure,
+        probability_of_exploit = baseline_p,
+        gemini_analysis        = gemini_result,
+        effective_probability  = effective_p,
+        impact_breakdown       = breakdown,
+        total_impact           = total_impact,
+        expected_loss          = expected_loss,
+        expected_loss_10th     = expected_loss_10th,
+        expected_loss_90th     = expected_loss_90th,
+        fix_effort_hours       = fix_effort,
+        fix_cost_usd           = fix_cost,
+        priority_score         = priority_score,
+        roi_of_fixing          = roi,
+        business_brief         = ""
+    )
+    from engine.business_brief import generate_business_brief
+    result.business_brief = generate_business_brief(result, company)
+    return result, False
+
 def run_risk_engine(
     findings: list,
     company: CompanyContext,
@@ -140,89 +221,18 @@ def run_risk_engine(
     results       = []
     filtered_count = 0
 
-    for f in findings:
-        bug_type    = classify_bug(f.get("raw_rule_id", ""), f.get("message", ""))
-        fix_effort  = get_fix_effort(bug_type, taxonomy)
-        # Map file to an asset if defined
-        asset = None
-        if company.assets:
-            for ac in company.assets:
-                for path in ac.paths:
-                    if path in f["file"]:
-                        asset = ac
-                        break
-                if asset: break
-
-        # Environment & Exposure override based on asset
-        exposure = asset.exposure.upper() if asset else f.get("exposure", company.deployment_exposure.upper())
-
-        # Pass CVE ID for EPSS lookup (EPSS only applies to real CVEs from Trivy)
-        cve_id = f.get("cve_id") or f.get("raw_rule_id", "")
-        controls_eff = asset.controls_efficacy if asset else None
-        baseline_p, prob_source = get_probability(bug_type, exposure, probabilities, cve_id=cve_id, asset=asset, controls_efficacy=controls_eff)
-
-        # --- Gemini analysis ---
-        gemini_result = None
-        effective_p   = baseline_p
-        if gemini_api_key and f.get("code_context"):
-            gemini_result = analyze_vulnerability(
-                bug_type=bug_type,
-                file=f["file"],
-                line=f["line"],
-                code_context=f.get("code_context", ""),
-                message=f.get("message", ""),
-                exposure=exposure,
-                company=company,
-                baseline_probability=baseline_p,
-                asset=asset
-            )
-            if gemini_result:
-                effective_p = gemini_result.adjusted_probability
-                # Skip confirmed false positives
-                if gemini_result.false_positive_likelihood == "high" and \
-                   not gemini_result.is_exploitable:
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(_process_single_finding, f, company, probabilities, taxonomy, gemini_api_key): f for f in findings}
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                res, is_filtered = future.result()
+                if is_filtered:
                     filtered_count += 1
-                    continue  # Actually filter the finding out as per Phase 0 goals
-
-        breakdown, total_impact, impact_params = compute_total_impact(company, bug_type, gemini_result, asset)
-
-        # Apply file-path criticality multiplier to expected loss
-        # This makes vulns in payment/auth code weigh more than the same bug in test code
-        _, crit_multiplier, _ = get_asset_criticality(f["file"])
-
-        from engine.monte_carlo import run_lec_simulation
-        sim_stats = run_lec_simulation(effective_p, impact_params)
-        expected_loss = sim_stats["mean"] * crit_multiplier
-        expected_loss_10th = sim_stats["p10"] * crit_multiplier
-        expected_loss_90th = sim_stats["p90"] * crit_multiplier
-
-        priority_score = compute_priority_score(expected_loss, fix_effort)
-        fix_cost       = compute_fix_cost(fix_effort, company.engineer_hourly_cost)
-        roi            = compute_roi(expected_loss, fix_cost)
-
-        result = RiskResult(
-            vulnerability_id       = f["id"],
-            bug_type               = bug_type,
-            file                   = f["file"],
-            line                   = f["line"],
-            severity               = f.get("severity", "medium"),
-            exposure               = exposure,
-            probability_of_exploit = baseline_p,
-            gemini_analysis        = gemini_result,
-            effective_probability  = effective_p,
-            impact_breakdown       = breakdown,
-            total_impact           = total_impact,
-            expected_loss          = expected_loss,
-            expected_loss_10th     = expected_loss_10th,
-            expected_loss_90th     = expected_loss_90th,
-            fix_effort_hours       = fix_effort,
-            fix_cost_usd           = fix_cost,
-            priority_score         = priority_score,
-            roi_of_fixing          = roi,
-            business_brief         = ""
-        )
-        result.business_brief = generate_business_brief(result, company)
-        results.append(result)
+                elif res:
+                    results.append(res)
+            except Exception as e:
+                logger.error(f"Error processing finding in parallel: {e}")
 
     ranked = rank_vulnerabilities(results)
 
