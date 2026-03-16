@@ -32,7 +32,7 @@ from engine.expected_loss import (compute_expected_loss, compute_priority_score,
                                    compute_fix_cost, compute_roi)
 from engine.ranker import rank_vulnerabilities
 from engine.gemini_analyzer import init_gemini, analyze_vulnerability
-from engine.attack_chain import find_attack_chains
+from engine.attack_graph import find_topological_chains
 from engine.business_brief import generate_business_brief, generate_executive_summary
 from prometheus_fastapi_instrumentator import Instrumentator
 from engine.auto_remediator import generate_remediation, apply_remediation, validate_syntax
@@ -229,7 +229,7 @@ def run_risk_engine(
     # --- Attack chain analysis ---
     chains = []
     if gemini_api_key and len(ranked) >= 2:
-        chains = find_attack_chains(ranked, company)
+        chains = find_topological_chains(ranked, company)
         # Tag each result with its chains
         for chain in chains:
             for r in ranked:
