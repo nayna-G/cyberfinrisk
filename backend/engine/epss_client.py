@@ -10,6 +10,38 @@ import logging
 logger = logging.getLogger(__name__)
 
 EPSS_API_URL = "https://api.first.org/data/v1/epss"
+CISA_KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+
+_cisa_kev_cache: Optional[set] = None
+
+def get_cisa_kev_catalog() -> set[str]:
+    """
+    Fetches the CISA Known Exploited Vulnerabilities catalog.
+    Caches the result in memory for the duration of execution.
+    """
+    global _cisa_kev_cache
+    if _cisa_kev_cache is not None:
+        return _cisa_kev_cache
+
+    try:
+        logger.info("Fetching CISA KEV Catalog...")
+        response = httpx.get(CISA_KEV_URL, timeout=5.0)
+        response.raise_for_status()
+        data = response.json()
+        vulns = data.get("vulnerabilities", [])
+        _cisa_kev_cache = {v["cveID"].upper() for v in vulns if "cveID" in v}
+        logger.info(f"CISA KEV Catalog loaded: {len(_cisa_kev_cache)} CVEs")
+        return _cisa_kev_cache
+    except Exception as e:
+        logger.warning(f"Failed to fetch CISA KEV Catalog: {e}")
+        return set()
+
+def is_cisa_kev(cve_id: str) -> bool:
+    """Checks if a CVE ID is in the CISA KEV catalog"""
+    if not cve_id or not cve_id.upper().startswith("CVE-"):
+        return False
+    catalog = get_cisa_kev_catalog()
+    return cve_id.upper() in catalog
 
 def get_epss_score(cve_id: str) -> Optional[float]:
     """

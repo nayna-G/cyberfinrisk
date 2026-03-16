@@ -8,6 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+
+class RemediationRequest(BaseModel):
+    file_path: str
+    line: int
+    code_context: str
+    bug_type: str
 from sqlalchemy.orm import Session
 from contextlib import asynccontextmanager
 from logging_config import setup_logging
@@ -29,6 +35,7 @@ from engine.gemini_analyzer import init_gemini, analyze_vulnerability
 from engine.attack_chain import find_attack_chains
 from engine.business_brief import generate_business_brief, generate_executive_summary
 from prometheus_fastapi_instrumentator import Instrumentator
+from engine.auto_remediator import generate_remediation, apply_remediation, validate_syntax
 from utils.email_utils import send_invite_email
 
 from models.db import (
@@ -233,6 +240,28 @@ def run_risk_engine(
 
     return ranked, chains, filtered_count
 
+
+@app.post("/remediate")
+async def remediate_vulnerability(req: RemediationRequest, gemini_api_key: Optional[str] = None):
+    api_key = gemini_api_key or os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Gemini API key required")
+         
+    patch_data = generate_remediation(req.file_path, req.line, req.code_context, req.bug_type, api_key)
+    if not patch_data:
+        raise HTTPException(status_code=500, detail="Failed to generate patch")
+         
+    abs_path = os.path.join(os.getcwd(), req.file_path)
+    success = apply_remediation(abs_path, req.line, patch_data)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to apply patch")
+         
+    is_valid = validate_syntax(abs_path)
+    return {
+        "success": success,
+        "valid_syntax": is_valid,
+        "explanation": patch_data.get("explanation", "")
+    }
 
 @app.post("/analyze-manual", response_model=AnalysisResponse)
 async def analyze_manual(req: ManualScanRequest):

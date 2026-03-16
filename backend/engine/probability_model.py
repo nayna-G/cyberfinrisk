@@ -22,12 +22,16 @@ def get_probability(
     """
     # Attempt EPSS lookup for CVE-identified vulnerabilities
     if cve_id and cve_id.upper().startswith("CVE-"):
-        from engine.epss_client import get_epss_score
+        from engine.epss_client import get_epss_score, is_cisa_kev
         epss_score = get_epss_score(cve_id)
+        is_kev = is_cisa_kev(cve_id)
+        
         if epss_score is not None:
             final_score = min(epss_score, 0.95)
-            logger.info(f"Using EPSS score {final_score:.4f} for {cve_id}")
-            return final_score, f"epss:{cve_id}"
+            if is_kev:
+                final_score = min(0.98, final_score * 1.5) # Amplify exploitability
+            logger.info(f"Using EPSS score {final_score:.4f} (KEV={is_kev}) for {cve_id}")
+            return final_score, f"epss_kev:{cve_id}" if is_kev else f"epss:{cve_id}"
 
     # Fallback to FAIR Bayesian Network instead of static rate
     try:
