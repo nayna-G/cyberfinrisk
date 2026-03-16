@@ -176,13 +176,18 @@ def run_risk_engine(
                     filtered_count += 1
                     continue  # Actually filter the finding out as per Phase 0 goals
 
-        breakdown, total_impact = compute_total_impact(company, bug_type, gemini_result, asset)
+        breakdown, total_impact, impact_params = compute_total_impact(company, bug_type, gemini_result, asset)
 
         # Apply file-path criticality multiplier to expected loss
         # This makes vulns in payment/auth code weigh more than the same bug in test code
         _, crit_multiplier, _ = get_asset_criticality(f["file"])
 
-        expected_loss  = compute_expected_loss(effective_p, total_impact) * crit_multiplier
+        from engine.monte_carlo import run_lec_simulation
+        sim_stats = run_lec_simulation(effective_p, impact_params)
+        expected_loss = sim_stats["mean"] * crit_multiplier
+        expected_loss_10th = sim_stats["p10"] * crit_multiplier
+        expected_loss_90th = sim_stats["p90"] * crit_multiplier
+
         priority_score = compute_priority_score(expected_loss, fix_effort)
         fix_cost       = compute_fix_cost(fix_effort, company.engineer_hourly_cost)
         roi            = compute_roi(expected_loss, fix_cost)
@@ -200,6 +205,8 @@ def run_risk_engine(
             impact_breakdown       = breakdown,
             total_impact           = total_impact,
             expected_loss          = expected_loss,
+            expected_loss_10th     = expected_loss_10th,
+            expected_loss_90th     = expected_loss_90th,
             fix_effort_hours       = fix_effort,
             fix_cost_usd           = fix_cost,
             priority_score         = priority_score,

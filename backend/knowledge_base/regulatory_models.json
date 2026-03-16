@@ -4,7 +4,11 @@
         "max_fine_usd": 20000000
     },
     "PCI_DSS": {
-        "avg_fine": 250000
+        "avg_fine": {
+            "min": 100000,
+            "likely": 250000,
+            "max": 500000
+        }
     },
     "HIPAA": {
         "max_annual": 1900000

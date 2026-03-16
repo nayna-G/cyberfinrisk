@@ -41,6 +41,8 @@ class RiskResult(BaseModel):
     impact_breakdown: ImpactBreakdown
     total_impact: float
     expected_loss: float
+    expected_loss_10th: Optional[float] = None
+    expected_loss_90th: Optional[float] = None
     fix_effort_hours: float
     fix_cost_usd: float
     priority_score: float

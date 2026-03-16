@@ -1,25 +1,25 @@
 {
     "cost_per_record_by_industry": {
-        "finance": 250,
-        "healthcare": 400,
-        "technology": 150,
-        "retail": 130,
-        "education": 100,
-        "default": 165
+        "finance": { "min": 150, "likely": 250, "max": 400 },
+        "healthcare": { "min": 250, "likely": 400, "max": 600 },
+        "technology": { "min": 100, "likely": 150, "max": 250 },
+        "retail": { "min": 80, "likely": 130, "max": 200 },
+        "education": { "min": 60, "likely": 100, "max": 160 },
+        "default": { "min": 100, "likely": 165, "max": 250 }
     },
     "incident_response_cost": {
-        "startup": 30000,
-        "mid_size": 100000,
-        "enterprise": 500000
+        "startup": { "min": 15000, "likely": 30000, "max": 60000 },
+        "mid_size": { "min": 50000, "likely": 100000, "max": 200000 },
+        "enterprise": { "min": 250000, "likely": 500000, "max": 1000000 }
     },
     "downtime_cost_per_hour": {
-        "startup": 2000,
-        "mid_size": 12000,
-        "enterprise": 60000
+        "startup": { "min": 1000, "likely": 2000, "max": 4000 },
+        "mid_size": { "min": 6000, "likely": 12000, "max": 24000 },
+        "enterprise": { "min": 30000, "likely": 60000, "max": 120000 }
     },
     "churn_rate_after_breach": {
-        "low_sensitivity": 0.02,
-        "medium_sensitivity": 0.05,
-        "high_sensitivity": 0.10
+        "low_sensitivity": { "min": 0.01, "likely": 0.02, "max": 0.04 },
+        "medium_sensitivity": { "min": 0.02, "likely": 0.05, "max": 0.10 },
+        "high_sensitivity": { "min": 0.05, "likely": 0.10, "max": 0.20 }
     }
 }

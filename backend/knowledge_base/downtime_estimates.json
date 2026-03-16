@@ -1,19 +1,79 @@
 {
     "downtime_hours_by_bug_type": {
-        "SQL_INJECTION": 4,
-        "AUTH_BYPASS": 6,
-        "RCE": 8,
-        "COMMAND_INJECTION": 6,
-        "INSECURE_DESERIALIZATION": 5,
-        "SSRF": 3,
-        "HARDCODED_CREDENTIALS": 4,
-        "XSS": 1,
-        "IDOR": 2,
-        "PATH_TRAVERSAL": 2,
-        "CSRF": 1,
-        "WEAK_CRYPTO": 2,
-        "INSECURE_RANDOM": 1,
-        "OPEN_REDIRECT": 0.5,
-        "UNKNOWN": 2
+        "SQL_INJECTION": {
+            "min": 2,
+            "likely": 4,
+            "max": 8
+        },
+        "AUTH_BYPASS": {
+            "min": 3,
+            "likely": 6,
+            "max": 12
+        },
+        "RCE": {
+            "min": 4,
+            "likely": 8,
+            "max": 24
+        },
+        "COMMAND_INJECTION": {
+            "min": 3,
+            "likely": 6,
+            "max": 12
+        },
+        "INSECURE_DESERIALIZATION": {
+            "min": 2,
+            "likely": 5,
+            "max": 10
+        },
+        "SSRF": {
+            "min": 1,
+            "likely": 3,
+            "max": 6
+        },
+        "HARDCODED_CREDENTIALS": {
+            "min": 2,
+            "likely": 4,
+            "max": 8
+        },
+        "XSS": {
+            "min": 0.5,
+            "likely": 1,
+            "max": 2
+        },
+        "IDOR": {
+            "min": 1,
+            "likely": 2,
+            "max": 4
+        },
+        "PATH_TRAVERSAL": {
+            "min": 1,
+            "likely": 2,
+            "max": 4
+        },
+        "CSRF": {
+            "min": 0.5,
+            "likely": 1,
+            "max": 2
+        },
+        "WEAK_CRYPTO": {
+            "min": 1,
+            "likely": 2,
+            "max": 4
+        },
+        "INSECURE_RANDOM": {
+            "min": 0.5,
+            "likely": 1,
+            "max": 2
+        },
+        "OPEN_REDIRECT": {
+            "min": 0.2,
+            "likely": 0.5,
+            "max": 1
+        },
+        "UNKNOWN": {
+            "min": 1,
+            "likely": 2,
+            "max": 4
+        }
     }
 }
