@@ -14,13 +14,15 @@ def get_probability(
     exposure: str,
     probabilities: Dict,
     cve_id: Optional[str] = None,
-    asset: Optional[dict] = None # Will be passed as AssetContext or dict
+    asset: Optional[dict] = None,
+    controls_efficacy: Optional[float] = None # Added for FAIR-CAM
 ) -> tuple[float, str]:
     """
     Returns (probability: float, source: str).
     """
     # Attempt EPSS lookup for CVE-identified vulnerabilities
     if cve_id and cve_id.upper().startswith("CVE-"):
+        from engine.epss_client import get_epss_score
         epss_score = get_epss_score(cve_id)
         if epss_score is not None:
             final_score = min(epss_score, 0.95)
@@ -30,7 +32,7 @@ def get_probability(
     # Fallback to FAIR Bayesian Network instead of static rate
     try:
         from engine.fair_bn import get_bn_probability
-        bn_p = get_bn_probability(exposure, bug_type, asset)
+        bn_p = get_bn_probability(exposure, bug_type, asset, controls_efficacy=controls_efficacy)
         if bn_p > 0:
             return min(bn_p, 0.95), "fair_bn"
     except Exception as e:

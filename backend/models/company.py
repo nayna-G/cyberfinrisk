@@ -10,6 +10,7 @@ class AssetContext(BaseModel):
     sensitive_data_types: List[str]      # e.g., ["PII", "credentials"]
     exposure: str                        # "internet-facing", "internal", "none"
     environment: str                     # "prod", "staging", "dev", "test"
+    controls_efficacy: Optional[float] = None # range 0.0 - 1.0 (EPSS-esque)
 
 class CompanyContext(BaseModel):
     company_name: str

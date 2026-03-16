@@ -151,7 +151,8 @@ def run_risk_engine(
 
         # Pass CVE ID for EPSS lookup (EPSS only applies to real CVEs from Trivy)
         cve_id = f.get("cve_id") or f.get("raw_rule_id", "")
-        baseline_p, prob_source = get_probability(bug_type, exposure, probabilities, cve_id=cve_id, asset=asset)
+        controls_eff = asset.controls_efficacy if asset else None
+        baseline_p, prob_source = get_probability(bug_type, exposure, probabilities, cve_id=cve_id, asset=asset, controls_efficacy=controls_eff)
 
         # --- Gemini analysis ---
         gemini_result = None
