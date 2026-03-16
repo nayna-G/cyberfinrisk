@@ -54,6 +54,19 @@ export const api = {
         });
     },
 
+    async remediate(payload: {
+        file_path: string;
+        line: number;
+        code_context: string;
+        bug_type: string;
+        gemini_api_key?: string | null;
+    }): Promise<{ success: boolean; valid_syntax: boolean; explanation: string }> {
+        return fetchAPI("/remediate", {
+            method: "POST",
+            body: JSON.stringify(payload),
+        });
+    },
+
     async createOrganization(payload: {
         name: string;
         slug: string;

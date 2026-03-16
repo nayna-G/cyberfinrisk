@@ -27,6 +27,9 @@ export interface GeminiAnalysis {
     exploitability_reasoning: string;
     recommended_fix: string;
     false_positive_likelihood: string;
+    fix_complexity?: string;
+    authentication_required?: string;
+    data_scope?: string;
 }
 
 export interface VulnerabilityResult {
@@ -37,14 +40,18 @@ export interface VulnerabilityResult {
     severity: string;
     exposure: string;
     expected_loss: number;
+    expected_loss_10th?: number;
+    expected_loss_90th?: number;
     total_impact: number;
     fix_cost_usd: number;
     fix_effort_hours: number;
     roi_of_fixing: number;
     effective_probability: number;
+    probability_source?: string;
     business_brief: string;
     gemini_analysis: GeminiAnalysis | null;
     attack_chains: string[];
+    impact_breakdown?: Record<string, number>;
 }
 
 export interface AttackChain {
